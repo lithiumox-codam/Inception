@@ -1,15 +1,9 @@
-# Use the penultimate stable version of Alpine (adjust if needed, check available PHP versions)
 FROM alpine:3.21
 
-# Set WordPress version (optional, use 'latest' or a specific version)
 ARG WP_VERSION=latest
-
-# Environment variable for the web root (mount point)
 ENV WP_PATH=/var/www/html
-# Environment variable for the source files within the image
 ENV WP_SOURCE_DIR=/usr/src/wordpress
 
-# Install dependencies:
 RUN apk update && \
     apk add --no-cache \
     bash \
@@ -40,25 +34,18 @@ RUN apk update && \
     php82-iconv \
     php82-bcmath \
     php82-exif && \
-    # Clean up apk cache
     rm -rf /var/cache/apk/*
 
-# Create a symlink for the PHP version (e.g., php82 -> php)
 RUN ln -s /usr/bin/php82 /usr/bin/php
 
-# --- PHP-FPM Configuration ---
-# Configure GLOBAL PHP-FPM settings (php-fpm.conf)
+# Changes to the default PHP-FPM configuration with sed so that it runs in the foreground and logs to stderr
 RUN sed -i "s|;daemonize = yes|daemonize = no|g" /etc/php82/php-fpm.conf && \
     sed -i "s|error_log = /var/log/php82/error.log|error_log = /dev/stderr|g" /etc/php82/php-fpm.conf
 
-# Copy our custom pool configuration (www.conf) - THIS REPLACES THE DEFAULT
-# Assumes 'www.conf' is in './wordpress/conf/' relative to docker-compose.yml
 COPY ./conf/www.conf /etc/php82/php-fpm.d/www.conf
 
-# Ensure the copied config file has appropriate permissions
 RUN chown root:root /etc/php82/php-fpm.d/www.conf && \
     chmod 644 /etc/php82/php-fpm.d/www.conf
-# --- End PHP-FPM Configuration ---
 
 # Download and install WP-CLI
 RUN curl -o /usr/local/bin/wp https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && \
@@ -82,18 +69,14 @@ RUN curl -o /tmp/wordpress.tar.gz -SL https://wordpress.org/wordpress-${WP_VERSI
 RUN mkdir -p ${WP_PATH} && chown nobody:nobody ${WP_PATH}
 
 # Copy entrypoint script and make it executable
-# Assumes 'init.sh' is in './wordpress/tools/' relative to docker-compose.yml
 COPY ./tools/init.sh /usr/local/bin/init.sh
 RUN chmod +x /usr/local/bin/init.sh
 
-# Set working directory (this will be the volume mount point)
+# Sets the working directory to the web root directory
 WORKDIR ${WP_PATH}
 
-# Expose port 9000 for internal communication with Nginx
 EXPOSE 9000
 
-# Set entrypoint script
 ENTRYPOINT ["/usr/local/bin/init.sh"]
 
-# Default command: Run PHP-FPM in the foreground using the full path
 CMD ["/usr/sbin/php-fpm82", "-F"]

@@ -8,7 +8,7 @@ services:
       - db_data:/var/lib/mysql
     env_file:
       - .env
-    restart: unless-stopped # Restart policy
+    restart: unless-stopped
     healthcheck:
       test: [ "CMD-SHELL", "mariadb-admin ping -h localhost -u root -p\"$${DB_ROOT_PASSWORD}\" --silent" ]
       interval: 10s
@@ -22,11 +22,9 @@ services:
     networks:
       - inception
     volumes:
-      # Mount the shared volume where WordPress core/content lives
       - wp_data:/var/www/html
-      - ./requirements/wordpress/conf/www.conf:/etc/php82/php-fpm.d/www.conf:ro
     env_file:
-      - .env # Load environment variables from .env file
+      - .env
     depends_on:
       mariadb:
         condition: service_healthy
@@ -36,10 +34,9 @@ services:
     container_name: nginx
     build: ./requirements/nginx
     ports:
-      # Map host port 443 to container port 443 for HTTPS
       - "443:443"
     env_file:
-      - .env # Load environment variables from .env file
+      - .env
     networks:
       - inception
     volumes:
@@ -55,4 +52,4 @@ volumes:
 
 networks:
   inception:
-    driver: bridge # Use the default bridge driver for the custom network
+    driver: bridge

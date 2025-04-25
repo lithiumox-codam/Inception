@@ -31,27 +31,19 @@ done
 if [ ! -f "${WP_PATH}/wp-includes/version.php" ]; then
   log "WordPress directory (${WP_PATH}) appears empty."
   log "Copying files from image source ${WP_SOURCE_DIR}..."
-  # Use cp -a to preserve ownership/permissions if possible, '.' copies hidden files.
-  # Using cp -rp as a robust alternative.
+  # -rp to preserve permissions and timestamps
   cp -rp "${WP_SOURCE_DIR}/." "${WP_PATH}/"
   log "Files copied."
-  # Ensure ownership is correct *after* copying into the volume
   log "Setting ownership for ${WP_PATH}..."
-  # Use 'nobody' user/group as defined in Dockerfile and www.conf
   chown -R nobody:nobody "${WP_PATH}"
   log "Ownership set for volume contents."
 else
     log "WordPress directory (${WP_PATH}) already contains files. Skipping copy."
-    # Optional: Ensure permissions are still correct on existing volume
-    # log "Verifying ownership for existing ${WP_PATH}..."
-    # chown -R nobody:nobody "${WP_PATH}"
-    # log "Ownership verified."
 fi
 
 # --- Wait for Database ---
 log "Waiting for database host ${DB_HOST}..."
 counter=0
-# Use mariadb-admin which is installed by mysql-client package
 while ! mariadb-admin ping -h"${DB_HOST}" -u"${DB_USER}" -p"${DB_PASSWORD}" --silent --connect-timeout=1; do
   counter=$((counter + 1))
   if [ $counter -ge $MAX_DB_WAIT ]; then
@@ -63,20 +55,11 @@ while ! mariadb-admin ping -h"${DB_HOST}" -u"${DB_USER}" -p"${DB_PASSWORD}" --si
 done
 log "Database connection successful!"
 
-# --- WordPress Setup ---
-# Change directory *after* potentially copying files and waiting for DB
 cd ${WP_PATH}
 
-# Create wp-config.php if it doesn't exist
+# --- Check for wp-config.php ---
 if [ ! -f "${WP_CONFIG_FILE}" ]; then
   log "Creating wp-config.php..."
-  # Generate salts using WP-CLI if possible, otherwise use placeholder
-  # (Requires internet access from container during build/runtime)
-  # wp config set --allow-root --type=constant WP_DEBUG false --raw
-  # wp config shuffle-salts --allow-root
-
-  # Use wp-cli to generate wp-config.php
-  # --allow-root is needed because this script runs as root initially
   wp config create --allow-root \
     --dbname="${DB_NAME}" \
     --dbuser="${DB_USER}" \
@@ -84,14 +67,11 @@ if [ ! -f "${WP_CONFIG_FILE}" ]; then
     --dbhost="${DB_HOST}" \
     --skip-check \
     --extra-php <<PHP
-define('FS_METHOD', 'direct'); // Often needed for plugin/theme installs in Docker
-// Add any other custom defines here if needed
-// define( 'WP_DEBUG', false );
+define('FS_METHOD', 'direct'); // Allow direct file access for plugins/themes
 PHP
   log "wp-config.php created."
-  # Set permissions for wp-config.php specifically
   chown nobody:nobody "${WP_CONFIG_FILE}"
-  chmod 640 "${WP_CONFIG_FILE}" # More secure permissions
+  chmod 640 "${WP_CONFIG_FILE}"
 else
   log "wp-config.php already exists."
 fi
@@ -100,8 +80,6 @@ fi
 # Use --path to be explicit, though WORKDIR should handle it
 if ! wp core is-installed --allow-root --path="${WP_PATH}"; then
   log "Installing WordPress core..."
-  # Run core install as the 'nobody' user to avoid permission issues later
-  # Requires sudo package to be installed in Dockerfile
   sudo -u nobody -E wp core install --path="${WP_PATH}" \
     --url="https://${DOMAIN_NAME}" \
     --title="Inception - ${DOMAIN_NAME}" \
@@ -139,7 +117,5 @@ else
   fi
 fi
 
-# --- Execute the CMD ---
 log "Starting PHP-FPM..."
-# Use exec to replace the script process with php-fpm
 exec "$@"
