@@ -1,0 +1,58 @@
+services:
+  mariadb:
+    container_name: mariadb
+    build: ./requirements/mariadb
+    networks:
+      - inception
+    volumes:
+      - db_data:/var/lib/mysql
+    env_file:
+      - .env
+    restart: unless-stopped # Restart policy
+    healthcheck:
+      test: [ "CMD-SHELL", "mariadb-admin ping -h localhost -u root -p\"$${DB_ROOT_PASSWORD}\" --silent" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  wordpress:
+    container_name: wordpress
+    build: ./requirements/wordpress
+    networks:
+      - inception
+    volumes:
+      # Mount the shared volume where WordPress core/content lives
+      - wp_data:/var/www/html
+      - ./requirements/wordpress/conf/www.conf:/etc/php82/php-fpm.d/www.conf:ro
+    env_file:
+      - .env # Load environment variables from .env file
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    restart: unless-stopped
+
+  nginx:
+    container_name: nginx
+    build: ./requirements/nginx
+    ports:
+      # Map host port 443 to container port 443 for HTTPS
+      - "443:443"
+    env_file:
+      - .env # Load environment variables from .env file
+    networks:
+      - inception
+    volumes:
+      - wp_data:/var/www/html:ro
+    depends_on:
+      - wordpress
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  wp_data:
+
+
+networks:
+  inception:
+    driver: bridge # Use the default bridge driver for the custom network

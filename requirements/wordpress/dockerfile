@@ -1,15 +1,99 @@
-FROM debian:buster
+# Use the penultimate stable version of Alpine (adjust if needed, check available PHP versions)
+FROM alpine:3.21
 
+# Set WordPress version (optional, use 'latest' or a specific version)
+ARG WP_VERSION=latest
 
-RUN apt update -y 
+# Environment variable for the web root (mount point)
+ENV WP_PATH=/var/www/html
+# Environment variable for the source files within the image
+ENV WP_SOURCE_DIR=/usr/src/wordpress
 
-RUN apt install php-fpm php-mysql -y
+# Install dependencies:
+RUN apk update && \
+    apk add --no-cache \
+    bash \
+    curl \
+    tar \
+    mysql-client \
+    gettext \
+    sudo \
+    php82 \
+    php82-fpm \
+    php82-mysqli \
+    php82-json \
+    php82-curl \
+    php82-gd \
+    php82-intl \
+    php82-mbstring \
+    php82-opcache \
+    php82-xml \
+    php82-zip \
+    php82-phar \
+    php82-dom \
+    php82-simplexml \
+    php82-xmlwriter \
+    php82-tokenizer \
+    php82-fileinfo \
+    php82-session \
+    php82-ctype \
+    php82-iconv \
+    php82-bcmath \
+    php82-exif && \
+    # Clean up apk cache
+    rm -rf /var/cache/apk/*
 
-RUN apt install curl -y
+# Create a symlink for the PHP version (e.g., php82 -> php)
+RUN ln -s /usr/bin/php82 /usr/bin/php
 
+# --- PHP-FPM Configuration ---
+# Configure GLOBAL PHP-FPM settings (php-fpm.conf)
+RUN sed -i "s|;daemonize = yes|daemonize = no|g" /etc/php82/php-fpm.conf && \
+    sed -i "s|error_log = /var/log/php82/error.log|error_log = /dev/stderr|g" /etc/php82/php-fpm.conf
 
-COPY ./tools/script.sh /
-COPY ./tools/wp-config.php /
+# Copy our custom pool configuration (www.conf) - THIS REPLACES THE DEFAULT
+# Assumes 'www.conf' is in './wordpress/conf/' relative to docker-compose.yml
+COPY ./conf/www.conf /etc/php82/php-fpm.d/www.conf
 
+# Ensure the copied config file has appropriate permissions
+RUN chown root:root /etc/php82/php-fpm.d/www.conf && \
+    chmod 644 /etc/php82/php-fpm.d/www.conf
+# --- End PHP-FPM Configuration ---
 
-CMD [ "/script.sh" ]
+# Download and install WP-CLI
+RUN curl -o /usr/local/bin/wp https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && \
+    chmod +x /usr/local/bin/wp
+
+# Download WordPress core files and store them in the source directory within the image
+RUN curl -o /tmp/wordpress.tar.gz -SL https://wordpress.org/wordpress-${WP_VERSION}.tar.gz && \
+    tar -xzf /tmp/wordpress.tar.gz -C /tmp && \
+    # Create the source directory
+    mkdir -p ${WP_SOURCE_DIR} && \
+    # Copy downloaded files into the source directory
+    cp -rp /tmp/wordpress/. ${WP_SOURCE_DIR}/ && \
+    # Set ownership of source files
+    chown -R nobody:nobody ${WP_SOURCE_DIR} && \
+    # Clean up temporary files
+    rm /tmp/wordpress.tar.gz && \
+    rm -rf /tmp/wordpress
+
+# Create the web root directory (mount point) and set its ownership
+# The entrypoint will populate this directory from WP_SOURCE_DIR if the volume is empty
+RUN mkdir -p ${WP_PATH} && chown nobody:nobody ${WP_PATH}
+
+# Copy entrypoint script and make it executable
+# Assumes 'init.sh' is in './wordpress/tools/' relative to docker-compose.yml
+COPY ./tools/init.sh /usr/local/bin/init.sh
+RUN chmod +x /usr/local/bin/init.sh
+
+# Set working directory (this will be the volume mount point)
+WORKDIR ${WP_PATH}
+
+# Expose port 9000 for internal communication with Nginx
+EXPOSE 9000
+
+# Set entrypoint script
+ENTRYPOINT ["/usr/local/bin/init.sh"]
+
+# Default command: Run PHP-FPM in the foreground using the full path
+CMD ["/usr/sbin/php-fpm82", "-F"]
