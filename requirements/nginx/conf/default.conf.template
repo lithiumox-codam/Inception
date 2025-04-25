@@ -1,0 +1,56 @@
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name ${DOMAIN_NAME};
+
+    root /var/www/html;
+
+    index index.php index.html index.htm;
+
+    ssl_certificate /etc/nginx/ssl/nginx.crt;
+    ssl_certificate_key /etc/nginx/ssl/nginx.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    access_log /dev/stdout;
+    error_log /dev/stderr warn;
+
+    location ~* \.(css|js|woff|woff2|ttf|eot|svg|png|jpg|jpeg|gif|ico|webp|avif)$ {
+        try_files $uri =404;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.php?$args;
+    }
+
+    location ~ \.php$ {
+        location ~* /wp-content/uploads/.*\.php$ {
+            deny all;
+        }
+        include fastcgi_params;
+        fastcgi_pass wordpress:9000;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        fastcgi_param PATH_INFO $fastcgi_path_info;
+        fastcgi_param Host $host;
+        fastcgi_param X-Real-IP $remote_addr;
+        fastcgi_param X-Forwarded-For $proxy_add_x_forwarded_for;
+        fastcgi_param X-Forwarded-Proto $scheme;
+        fastcgi_param HTTPS on;
+        fastcgi_buffer_size 128k;
+        fastcgi_buffers 4 256k;
+        fastcgi_busy_buffers_size 256k;
+        fastcgi_no_cache 1;
+        fastcgi_cache_bypass 1;
+    }
+
+    location ~ /\. {
+        deny all;
+    }
+
+    location ~* /(?:readme\.html|license\.txt|wp-config-sample\.php|wp-config\.php|wp-admin/includes/|wp-content/plugins/debug\.log)$ {
+        deny all;
+    }
+}
