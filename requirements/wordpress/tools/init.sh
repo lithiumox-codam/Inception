@@ -41,20 +41,6 @@ else
     log "WordPress directory (${WP_PATH}) already contains files. Skipping copy."
 fi
 
-# --- Wait for Database ---
-log "Waiting for database host ${DB_HOST}..."
-counter=0
-while ! mariadb-admin ping -h"${DB_HOST}" -u"${DB_USER}" -p"${DB_PASSWORD}" --silent --connect-timeout=1; do
-  counter=$((counter + 1))
-  if [ $counter -ge $MAX_DB_WAIT ]; then
-    log "ERROR: Database connection timed out after ${MAX_DB_WAIT} seconds."
-    exit 1
-  fi
-  log "Database unavailable, waiting 1 second... (${counter}/${MAX_DB_WAIT})"
-  sleep 1
-done
-log "Database connection successful!"
-
 cd ${WP_PATH}
 
 # --- Check for wp-config.php ---
