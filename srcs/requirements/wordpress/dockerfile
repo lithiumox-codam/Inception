@@ -1,4 +1,4 @@
-FROM alpine:3.21
+FROM alpine:3.19
 
 ARG WP_VERSION=latest
 ENV WP_PATH=/var/www/html
