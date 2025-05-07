@@ -3,6 +3,8 @@ YELLOW = \033[0;33m
 BLUE = \033[0;34m
 RESET = \033[0m
 
+COMPOSE = docker compose -f ./srcs/docker-compose.yml
+
 all: up
 
 help:
@@ -27,23 +29,23 @@ help:
 
 build:
 	@echo "$(GREEN)Building containers...$(RESET)"
-	@docker compose build
+	@$(COMPOSE) build
 
 up:
 	@echo "$(GREEN)Starting containers...$(RESET)"
-	@docker compose up -d
+	@$(COMPOSE) up -d
 
 restart:
 	@echo "$(GREEN)Restarting containers...$(RESET)"
-	@docker compose restart
+	@$(COMPOSE) restart
 
 down:
 	@echo "$(GREEN)Stopping containers...$(RESET)"
-	@docker compose down
+	@$(COMPOSE) down
 
 clean:
 	@echo "$(YELLOW)Removing containers, networks, and volumes...$(RESET)"
-	@docker compose down -v
+	@$(COMPOSE) down -v
 
 fclean: clean
 	@echo "$(YELLOW)Removing all related Docker images...$(RESET)"
@@ -54,11 +56,11 @@ re: fclean build up
 
 logs:
 	@echo "$(BLUE)Showing logs (press Ctrl+C to exit)...$(RESET)"
-	@docker compose logs -f
+	@$(COMPOSE) logs -f
 
 ps:
 	@echo "$(BLUE)Listing containers...$(RESET)"
-	@docker compose ps
+	@$(COMPOSE) ps
 
 wordpress:
 	@echo "$(GREEN)Accessing WordPress container...$(RESET)"
@@ -75,9 +77,9 @@ nginx:
 wp-admin:
 	@echo "$(GREEN)Accessing WordPress admin...$(RESET)"
 	@open https://mdekker.42.fr/wp-admin || \
-	@xdg-open https://mdekker.42.fr/wp-admin || \
-	@start https://mdekker.42.fr/wp-admin || \
-	@echo "If the browser does not open, please visit:"
-	@echo "https://mdekker.42.fr/wp-admin"
+	xdg-open https://mdekker.42.fr/wp-admin || \
+	start https://mdekker.42.fr/wp-admin || \
+	echo "If the browser does not open, please visit:" && \
+	echo "https://mdekker.42.fr/wp-admin"
 
-.PHONY: all help build up down restart clean fclean re logs ps wordpress mariadb nginx
+.PHONY: all help build up down restart clean fclean re logs ps wordpress mariadb nginx wp-admin
