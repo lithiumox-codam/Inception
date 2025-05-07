@@ -5,12 +5,16 @@ services:
     networks:
       - inception
     volumes:
-      - db_data:/var/lib/mysql
+      - /home/mdekker/data/mariadb:/var/lib/mysql
     env_file:
       - .env
     restart: unless-stopped
     healthcheck:
-      test: [ "CMD-SHELL", "mariadb-admin ping -h localhost -u root -p\"$${DB_ROOT_PASSWORD}\" --silent" ]
+      test:
+        [
+          "CMD-SHELL",
+          'mariadb-admin ping -h localhost -u root -p"$${DB_ROOT_PASSWORD}" --silent',
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -22,7 +26,7 @@ services:
     networks:
       - inception
     volumes:
-      - wp_data:/var/www/html
+      - /home/mdekker/data/wordpress:/var/www/html
     env_file:
       - .env
     depends_on:
@@ -40,15 +44,10 @@ services:
     networks:
       - inception
     volumes:
-      - wp_data:/var/www/html:ro
+      - /home/mdekker/data/wordpress:/var/www/html:ro
     depends_on:
       - wordpress
     restart: unless-stopped
-
-volumes:
-  db_data:
-  wp_data:
-
 
 networks:
   inception:
